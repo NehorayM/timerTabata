@@ -36,7 +36,11 @@ for (const size of [
       args: size.scale !== 1 ? [`--force-device-scale-factor=${size.scale}`] : []
     })
     await setContentSize(app, 'main', size.w, size.h)
-    await page.waitForFunction(([w, h]) => window.innerWidth === w && window.innerHeight === h, [size.w, size.h])
+    // At 2x the requested height can exceed small screens (CI runners are 1024x768); the OS then clamps it.
+    await page.waitForFunction(
+      ([w, h, scale]) => window.innerWidth === w && (scale > 1 ? window.innerHeight > 300 : window.innerHeight === h),
+      [size.w, size.h, size.scale]
+    )
     const p = (n: string): string => `${size.tag}-${n}`
 
     // Editor (top) – reference image 2

@@ -120,3 +120,18 @@ export async function quit(app: ElectronApplication): Promise<void> {
   await app.evaluate(({ app }) => setTimeout(() => app.quit(), 10))
   await closed
 }
+
+/**
+ * Opens the mini timer with the M key. The key can arrive before the timer screen's keydown
+ * listener is attached (React effects run after paint), so retry a few times.
+ */
+export async function openMiniWithKey(app: ElectronApplication, page: Page): Promise<Page> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await page.keyboard.press('m')
+    for (let i = 0; i < 20; i++) {
+      if (app.windows().some((w) => w.url().includes('#mini'))) return miniPage(app)
+      await new Promise((r) => setTimeout(r, 100))
+    }
+  }
+  throw new Error('mini window not found')
+}

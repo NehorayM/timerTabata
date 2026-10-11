@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
-import { ROOT, advance, launch, miniPage, referenceWorkouts, seed, setContentSize, tempDir } from '../e2e/helpers'
+import { ROOT, advance, launch, openMiniWithKey, referenceWorkouts, seed, setContentSize, tempDir } from '../e2e/helpers'
 
 /**
  * Deterministic screenshots (frozen fake clock) for comparison against the reference
@@ -82,8 +82,7 @@ for (const size of [
 
     if (size.tag !== 'hidpi') {
       // Mini timer
-      await page.keyboard.press('m')
-      const mini = await miniPage(app)
+      const mini = await openMiniWithKey(app, page)
       await setContentSize(app, 'mini', 320, 180)
       await mini.waitForFunction(() => window.innerWidth === 320 && window.innerHeight === 180)
       await expect(mini.locator('.digits')).toHaveText('42')

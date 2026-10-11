@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test'
-import { ROOT, advance, hook, launch, miniPage, quit, referenceWorkouts, seed, tempDir } from './helpers'
+import { ROOT, advance, hook, launch, openMiniWithKey, quit, referenceWorkouts, seed, tempDir } from './helpers'
 
 type View = { index: number; status: string; displaySeconds: number; locked: boolean; phase: string } | null
 
@@ -118,8 +118,7 @@ test('lock blocks skip/stop/reset/editing on every surface; pause and unlock sta
   expect(await view()).not.toBeNull()
 
   // mini window: pause/resume allowed
-  await page.keyboard.press('m')
-  const mini = await miniPage(app)
+  const mini = await openMiniWithKey(app, page)
   await mini.getByRole('button', { name: 'Pause' }).click()
   await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible()
   await expect(mini.locator('.mini-phase')).toContainText('🔒')
@@ -139,8 +138,7 @@ test('lock blocks skip/stop/reset/editing on every surface; pause and unlock sta
 
 test('mini timer and main window stay in sync through the shared engine', async () => {
   const { app, page } = await startFixtureA()
-  await page.keyboard.press('m')
-  const mini = await miniPage(app)
+  const mini = await openMiniWithKey(app, page)
   await advance(app, 2000)
   await expect(mini.locator('.digits')).toHaveText('58')
   await expect(digits(page)).toHaveText('58')
@@ -159,7 +157,8 @@ test('mini timer and main window stay in sync through the shared engine', async 
   await expect.poll(() => hook(app, 'isAlwaysOnTop', 'mini')).toBe(false)
   // return to main
   await mini.getByRole('button', { name: 'Return to main window' }).click()
-  await mini.getByRole('button', { name: 'Close mini timer' }).click()
+  // The click closes this very page, so Playwright may report "target closed"; the poll below verifies it.
+  await mini.getByRole('button', { name: 'Close mini timer' }).click().catch(() => {})
   await expect.poll(() => app.windows().filter((w) => w.url().includes('#mini')).length).toBe(0)
   await app.close()
 })
@@ -365,8 +364,7 @@ test('heading shows total remaining; noise, keep-awake and mini focus settings',
   await expect.poll(noise).toBe('off')
 
   // the mini timer does not take keyboard focus on Linux by default
-  await page.keyboard.press('m')
-  const mini = await miniPage(app)
+  const mini = await openMiniWithKey(app, page)
   if (process.platform === 'linux') {
     expect(await hook(app, 'isFocusable', 'mini')).toBe(false)
     await page.evaluate(() => window.api.updateSettings({ miniFocusable: true }))

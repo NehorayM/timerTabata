@@ -28,6 +28,10 @@ Timer: <kbd>Space</kbd> pause/resume · <kbd>←</kbd>/<kbd>→</kbd> previous/n
 <kbd>M</kbd> mini timer · <kbd>Esc</kbd> back (the session keeps running). Editor: <kbd>Ctrl+S</kbd> save.
 Global shortcuts (off by default) are configured in Settings → Keyboard.
 
+## Installation
+
+Step-by-step install guide (Hebrew): [docs/INSTALL.md](docs/INSTALL.md).
+
 ## Requirements
 
 - Node.js 22 and npm

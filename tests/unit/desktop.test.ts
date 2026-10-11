@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { ensureOnScreen } from '../../src/main/bounds'
 import { linuxDesktopEntry, parseWorkoutArg, safeFileName, writeLinuxDesktopEntry } from '../../src/main/desktopShortcut'
 import { checkAccelerator, registerGlobalShortcuts } from '../../src/main/globalShortcuts'
-import { buildCapabilities, detectDisplayServer } from '../../src/main/platform'
+import { buildCapabilities, detectDisplayServer, needsX11Relaunch, ozoneFromArgv } from '../../src/main/platform'
 
 const primary = { x: 0, y: 0, width: 1920, height: 1040 }
 
@@ -79,5 +79,21 @@ describe('platform capabilities', () => {
     const x = buildCapabilities('linux', 'x11', true)
     expect([x.alwaysOnTop.available, x.tray.available, x.globalShortcuts.available]).toEqual([true, true, true])
     expect(buildCapabilities('win32', 'windows', null).tray.available).toBe(true)
+  })
+})
+
+describe('X11 preference on Wayland', () => {
+  const wl = { XDG_SESSION_TYPE: 'wayland', WAYLAND_DISPLAY: 'wayland-0' }
+  it('relaunches once with --ozone-platform=x11 only when needed', () => {
+    expect(needsX11Relaunch('linux', wl, ['/opt/TimerTabata/timertabata'], true)).toBe(true)
+    expect(needsX11Relaunch('linux', wl, ['/opt/TimerTabata/timertabata', '--ozone-platform=x11'], true)).toBe(false)
+    expect(needsX11Relaunch('linux', wl, ['x'], false)).toBe(false)
+    expect(needsX11Relaunch('linux', { XDG_SESSION_TYPE: 'x11' }, ['x'], true)).toBe(false)
+    expect(needsX11Relaunch('win32', wl, ['x'], true)).toBe(false)
+  })
+  it('reads the effective platform from the real command line', () => {
+    expect(ozoneFromArgv(['a', '--ozone-platform=x11'])).toBe('x11')
+    expect(ozoneFromArgv(['a'])).toBe('')
+    expect(detectDisplayServer(wl, 'linux', ozoneFromArgv(['a', '--ozone-platform=x11']))).toBe('xwayland')
   })
 })

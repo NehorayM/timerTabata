@@ -1,7 +1,7 @@
 {
   "name": "timertabata",
   "productName": "TimerTabata",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Offline interval/Tabata timer for Windows and Linux",
   "license": "Apache-2.0",
   "author": "TimerTabata contributors <nhoray.men.gever@gmail.com>",

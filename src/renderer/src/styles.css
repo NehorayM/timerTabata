@@ -692,6 +692,10 @@ bdi.desc,
   text-overflow: ellipsis;
   line-height: 1.1;
 }
+.heading-remaining {
+  color: rgba(255, 255, 255, 0.62);
+  font-variant-numeric: tabular-nums;
+}
 .timer-icon {
   width: 60px;
   height: 60px;
@@ -930,6 +934,24 @@ bdi.desc,
   gap: 12px;
   font-size: 16px;
   min-height: 36px;
+}
+.select-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 16px;
+  min-height: 36px;
+}
+.select-row select {
+  height: 34px;
+  min-width: 0;
+  max-width: 60%;
+  border: 1px solid #b0b3d6;
+  border-radius: 4px;
+  padding: 0 8px;
+  background: #fff;
+  color: var(--indigo-dark);
 }
 .switch-row input {
   width: 20px;

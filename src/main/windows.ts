@@ -16,6 +16,7 @@ export interface WindowHooks {
   onMiniClosed: () => void
   alwaysOnTopMain: () => boolean
   alwaysOnTopMini: () => boolean
+  miniFocusable: () => boolean
 }
 
 export class WindowManager {
@@ -67,10 +68,18 @@ export class WindowManager {
     })
     win.setMenuBarVisibility(false)
     if (this.hooks.alwaysOnTopMain()) win.setAlwaysOnTop(true, 'floating')
-    win.once('ready-to-show', () => {
+    let shown = false
+    const reveal = (): void => {
+      if (shown || win.isDestroyed()) return
+      shown = true
       if (this.state.mainMaximized) win.maximize()
       if (process.env.TT_HIDDEN !== '1') win.show()
-    })
+    }
+    win.once('ready-to-show', reveal)
+    // 'ready-to-show' waits for the first painted frame; with broken GPU drivers that frame may
+    // never arrive, which would leave the app running without a visible window.
+    win.webContents.once('did-finish-load', () => setTimeout(reveal, 1500))
+    setTimeout(reveal, 6000)
     win.on('close', (e) => this.hooks.onMainClose(e))
     const persist = (): void => this.scheduleSave('main', win)
     win.on('resize', persist)
@@ -85,11 +94,16 @@ export class WindowManager {
 
   openMini(): BrowserWindow {
     if (this.mini && !this.mini.isDestroyed()) {
-      this.mini.show()
+      if (this.mini.isFocusable()) this.mini.show()
+      else this.mini.showInactive()
       return this.mini
     }
     const b = this.placement(this.state.mini, MINI_DEFAULT)
+    // On Linux an always-on-top window that accepts focus can receive the keyboard after
+    // input-source (language) switches; by default the mini timer never takes focus.
+    const focusable = process.platform !== 'linux' || this.hooks.miniFocusable()
     const win = new BrowserWindow({
+      focusable,
       ...b,
       minWidth: 200,
       minHeight: 110,
@@ -103,7 +117,15 @@ export class WindowManager {
       webPreferences: this.webPreferences()
     })
     if (this.hooks.alwaysOnTopMini()) win.setAlwaysOnTop(true, 'floating')
-    win.once('ready-to-show', () => win.show())
+    let shown = false
+    const reveal = (): void => {
+      if (shown || win.isDestroyed()) return
+      shown = true
+      if (focusable) win.show()
+      else win.showInactive()
+    }
+    win.once('ready-to-show', reveal)
+    setTimeout(reveal, 3000)
     const persist = (): void => this.scheduleSave('mini', win)
     win.on('resize', persist)
     win.on('move', persist)

@@ -11,6 +11,7 @@ import {
   nativeImage,
   net,
   powerMonitor,
+  powerSaveBlocker,
   protocol,
   shell,
   Tray,
@@ -26,7 +27,7 @@ import type { Capabilities, SessionCheckpoint, SessionCommand, SessionView, Shor
 import { DataService } from './data'
 import { parseWorkoutArg, safeFileName, workoutArg, writeLinuxDesktopEntry } from './desktopShortcut'
 import { registerGlobalShortcuts } from './globalShortcuts'
-import { buildCapabilities, detectDisplayServer, hasStatusNotifierWatcher } from './platform'
+import { buildCapabilities, detectDisplayServer, hasStatusNotifierWatcher, needsX11Relaunch, ozoneFromArgv } from './platform'
 import { SessionManager } from './session'
 import { WindowManager } from './windows'
 
@@ -39,7 +40,15 @@ protocol.registerSchemesAsPrivileged([
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
 
 const data = new DataService(app.getPath('userData'))
-if (process.platform === 'linux' && data.getSettings().preferX11) app.commandLine.appendSwitch('ozone-platform', 'x11')
+const relaunchForX11 = needsX11Relaunch(process.platform, process.env, process.argv, data.getSettings().preferX11)
+if (relaunchForX11) {
+  // AppImage: relaunch the image itself, its mount point disappears when this process exits.
+  app.relaunch({ execPath: process.env.APPIMAGE || process.execPath, args: [...process.argv.slice(1), '--ozone-platform=x11'] })
+  app.exit(0)
+}
+// The timer needs no GPU. Some Linux drivers crash Chromium's GPU process (seen with old VA-API),
+// so acceleration is switched off on request, after a GPU crash, or with --disable-gpu.
+if (!data.getSettings().hardwareAcceleration || process.argv.includes('--disable-gpu')) app.disableHardwareAcceleration()
 
 function resourcePath(file: string): string {
   return app.isPackaged ? path.join(process.resourcesPath, file) : path.join(__dirname, '../../resources', file)
@@ -67,7 +76,8 @@ function main(): void {
     onMainClose: (e) => onMainClose(e),
     onMiniClosed: () => {},
     alwaysOnTopMain: () => data.getSettings().alwaysOnTopMain,
-    alwaysOnTopMini: () => data.getSettings().alwaysOnTopMini
+    alwaysOnTopMini: () => data.getSettings().alwaysOnTopMini,
+    miniFocusable: () => data.getSettings().miniFocusable
   })
 
   function send<K extends keyof ApiEvents>(event: K, payload: ApiEvents[K], target: 'all' | 'main' = 'all'): void {
@@ -83,6 +93,7 @@ function main(): void {
       send('session', view)
       updateTray(view)
       updateTicker()
+      updateKeepAwake()
     },
     sound: (ev) => send('sound', ev, 'main'),
     saveCheckpoint: (cp) => {
@@ -100,6 +111,17 @@ function main(): void {
       }
     }
   })
+
+  let awakeId: number | null = null
+  /** Keeps the display on while a workout runs (if enabled). */
+  function updateKeepAwake(): void {
+    const want = manager.running && data.getSettings().keepAwake
+    if (want && awakeId === null) awakeId = powerSaveBlocker.start('prevent-display-sleep')
+    else if (!want && awakeId !== null) {
+      powerSaveBlocker.stop(awakeId)
+      awakeId = null
+    }
+  }
 
   function updateTicker(): void {
     if (fakeClock) return
@@ -365,6 +387,8 @@ function main(): void {
       const p = patch as Record<string, unknown>
       if ('alwaysOnTopMain' in p) windows.main?.setAlwaysOnTop(r.value.alwaysOnTopMain, 'floating')
       if ('alwaysOnTopMini' in p) windows.mini?.setAlwaysOnTop(r.value.alwaysOnTopMini, 'floating')
+      if ('miniFocusable' in p && process.platform === 'linux') windows.mini?.setFocusable(r.value.miniFocusable)
+      if ('keepAwake' in p) updateKeepAwake()
       if ('globalShortcutsEnabled' in p || 'shortcuts' in p) applyShortcuts()
       send('settings', r.value)
       return r
@@ -452,6 +476,13 @@ function main(): void {
 
   app.on('window-all-closed', () => app.quit())
 
+  app.on('child-process-gone', (_e, details) => {
+    if (details.type !== 'GPU' || details.reason === 'clean-exit' || !data.getSettings().hardwareAcceleration) return
+    console.warn('GPU process crashed; disabling hardware acceleration for the next start', details.reason)
+    const r = data.updateSettings({ hardwareAcceleration: false })
+    if (r.ok) send('settings', r.value)
+  })
+
   app.whenReady().then(async () => {
     Menu.setApplicationMenu(null)
     protocol.handle(ASSET_SCHEME, (req) => {
@@ -462,7 +493,7 @@ function main(): void {
     })
     data.sweepImages(pendingRecovery ? [pendingRecovery.workout.workImage, pendingRecovery.workout.restImage] : [])
 
-    const display = detectDisplayServer(process.env, process.platform, app.commandLine.getSwitchValue('ozone-platform'))
+    const display = detectDisplayServer(process.env, process.platform, ozoneFromArgv(process.argv))
     const watcher = process.platform === 'linux' ? await hasStatusNotifierWatcher() : null
     caps = buildCapabilities(process.platform, display, watcher)
 
@@ -496,11 +527,13 @@ function main(): void {
           if (item && item.enabled !== false) (item.click as () => void)()
         },
         shortcut: (a: ShortcutAction) => shortcutAction(a),
-        isAlwaysOnTop: (t: 'main' | 'mini') => (t === 'main' ? windows.main : windows.mini)?.isAlwaysOnTop() ?? null
+        isAlwaysOnTop: (t: 'main' | 'mini') => (t === 'main' ? windows.main : windows.mini)?.isAlwaysOnTop() ?? null,
+        isFocusable: (t: 'main' | 'mini') => (t === 'main' ? windows.main : windows.mini)?.isFocusable() ?? null,
+        keepAwakeActive: () => awakeId !== null && powerSaveBlocker.isStarted(awakeId)
       })
       ;(globalThis as unknown as { __tt: unknown }).__tt = testHooks
     }
   })
 }
 
-main()
+if (!relaunchForX11) main()

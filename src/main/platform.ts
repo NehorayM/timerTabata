@@ -3,6 +3,25 @@ import type { Capabilities } from '../shared/types'
 
 export type DisplayServer = Capabilities['displayServer']
 
+/** The --ozone-platform value given on the real command line (read by Electron before app code runs). */
+export function ozoneFromArgv(argv: readonly string[]): string {
+  for (const a of argv) {
+    const m = a.match(/^--ozone-platform=([\w-]+)$/)
+    if (m) return m[1]
+  }
+  return ''
+}
+
+/**
+ * "Use X11" must be decided before Chromium starts: appending --ozone-platform at runtime only
+ * reaches child processes (the GPU process then draws via X11 into a Wayland window and nothing
+ * appears). So on a Wayland session the app relaunches itself once with the switch.
+ */
+export function needsX11Relaunch(platform: string, env: NodeJS.ProcessEnv, argv: readonly string[], preferX11: boolean): boolean {
+  const wayland = env.XDG_SESSION_TYPE === 'wayland' || !!env.WAYLAND_DISPLAY
+  return platform === 'linux' && preferX11 && wayland && ozoneFromArgv(argv) === '' && env.TT_NO_RELAUNCH !== '1'
+}
+
 /** Which display server Electron actually renders through (X11 via XWayland counts as X11 for window features). */
 export function detectDisplayServer(env: NodeJS.ProcessEnv, platform: string, ozoneSwitch: string): DisplayServer {
   if (platform === 'win32') return 'windows'

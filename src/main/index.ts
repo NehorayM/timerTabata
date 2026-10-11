@@ -27,7 +27,7 @@ import type { Capabilities, SessionCheckpoint, SessionCommand, SessionView, Shor
 import { DataService } from './data'
 import { parseWorkoutArg, safeFileName, workoutArg, writeLinuxDesktopEntry } from './desktopShortcut'
 import { registerGlobalShortcuts } from './globalShortcuts'
-import { buildCapabilities, detectDisplayServer, hasStatusNotifierWatcher } from './platform'
+import { buildCapabilities, detectDisplayServer, hasStatusNotifierWatcher, needsX11Relaunch, ozoneFromArgv } from './platform'
 import { SessionManager } from './session'
 import { WindowManager } from './windows'
 
@@ -40,7 +40,12 @@ protocol.registerSchemesAsPrivileged([
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
 
 const data = new DataService(app.getPath('userData'))
-if (process.platform === 'linux' && data.getSettings().preferX11) app.commandLine.appendSwitch('ozone-platform', 'x11')
+const relaunchForX11 = needsX11Relaunch(process.platform, process.env, process.argv, data.getSettings().preferX11)
+if (relaunchForX11) {
+  // AppImage: relaunch the image itself, its mount point disappears when this process exits.
+  app.relaunch({ execPath: process.env.APPIMAGE || process.execPath, args: [...process.argv.slice(1), '--ozone-platform=x11'] })
+  app.exit(0)
+}
 // The timer needs no GPU. Some Linux drivers crash Chromium's GPU process (seen with old VA-API),
 // so acceleration is switched off on request, after a GPU crash, or with --disable-gpu.
 if (!data.getSettings().hardwareAcceleration || process.argv.includes('--disable-gpu')) app.disableHardwareAcceleration()
@@ -488,7 +493,7 @@ function main(): void {
     })
     data.sweepImages(pendingRecovery ? [pendingRecovery.workout.workImage, pendingRecovery.workout.restImage] : [])
 
-    const display = detectDisplayServer(process.env, process.platform, app.commandLine.getSwitchValue('ozone-platform'))
+    const display = detectDisplayServer(process.env, process.platform, ozoneFromArgv(process.argv))
     const watcher = process.platform === 'linux' ? await hasStatusNotifierWatcher() : null
     caps = buildCapabilities(process.platform, display, watcher)
 
@@ -531,4 +536,4 @@ function main(): void {
   })
 }
 
-main()
+if (!relaunchForX11) main()

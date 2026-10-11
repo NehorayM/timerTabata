@@ -301,7 +301,8 @@ test('single instance: a second launch forwards the workout and exits', async ()
   seed(userData, referenceWorkouts())
   const { app, page } = await launch({ userData, env: { TT_NO_TRAY: '1' } })
   const electronBin = path.join(ROOT, 'node_modules/electron/dist', fs.readFileSync(path.join(ROOT, 'node_modules/electron/path.txt'), 'utf8').trim())
-  const sandbox = process.platform === 'linux' && process.getuid?.() === 0 ? ['--no-sandbox'] : []
+  // Same flag Playwright passes to the first instance (Ubuntu 24 restricts the Chromium sandbox on CI runners).
+  const sandbox = process.platform === 'linux' ? ['--no-sandbox'] : []
   const child = spawn(electronBin, [...sandbox, path.join(ROOT, 'out/main/index.js'), '--workout=ref-blue'], {
     env: { ...process.env, TT_USER_DATA: userData, TT_TEST: '1', TT_NO_TRAY: '1' },
     stdio: 'ignore'

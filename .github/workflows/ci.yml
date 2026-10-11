@@ -21,6 +21,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Fetch the Electron binary up front so parallel test workers don't race to download it (ETXTBSY).
+      - run: node node_modules/electron/install.js
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test

@@ -9,14 +9,14 @@ type View = { index: number; status: string; displaySeconds: number; locked: boo
 const sessionView = (app: ElectronApplication): Promise<View> =>
   app.evaluate(() => (globalThis as unknown as { __tt: { manager: { view(): View } } }).__tt.manager.view())
 const digits = (p: Page) => p.locator('.timer-screen .digits')
-const heading = (p: Page) => p.locator('.phase-heading')
+const timerPhase = (p: Page) => p.locator('.timer-screen')
 
 async function startFixtureA(env: Record<string, string> = { TT_NO_TRAY: '1' }, extraSettings = {}) {
   const userData = tempDir()
   seed(userData, referenceWorkouts(), { lastWorkoutId: 'ref-purple', ...extraSettings })
   const l = await launch({ userData, env })
   await l.page.getByRole('button', { name: 'START' }).click()
-  await expect(heading(l.page)).toHaveText('Prepare')
+  await expect(timerPhase(l.page)).toHaveAttribute('data-phase', 'prepare')
   return l
 }
 
@@ -42,7 +42,7 @@ test('start, countdown, pause/resume, skips and counters', async () => {
 
   // next resets to the full duration and keeps running
   await page.getByRole('button', { name: 'Next interval' }).click()
-  await expect(heading(page)).toHaveText('Work')
+  await expect(timerPhase(page)).toHaveAttribute('data-phase', 'work')
   await expect(digits(page)).toHaveText('45')
   await expect(page.locator('.timer-screen')).toHaveCSS('background-color', 'rgb(230, 74, 25)')
   await advance(app, 5000)
@@ -50,7 +50,7 @@ test('start, countdown, pause/resume, skips and counters', async () => {
   // previous, while paused, stays paused
   await page.getByRole('button', { name: 'Pause' }).click()
   await page.keyboard.press('ArrowLeft')
-  await expect(heading(page)).toHaveText('Prepare')
+  await expect(timerPhase(page)).toHaveAttribute('data-phase', 'prepare')
   await expect(digits(page)).toHaveText('01:00')
   await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible()
 
@@ -71,7 +71,7 @@ test('start, countdown, pause/resume, skips and counters', async () => {
   // finish after the final interval; delayed tick catches up over several phases
   await page.getByRole('button', { name: 'Resume' }).click()
   await advance(app, 45_000 + 60_000 + 45_000)
-  await expect(heading(page)).toHaveText('Finish')
+  await expect(timerPhase(page)).toHaveAttribute('data-phase', 'finish')
   await expect(page.locator('.interval-row.active')).toHaveText('Finish')
   await expect(page.getByRole('button', { name: 'Next interval' })).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Previous interval' })).toBeEnabled()
@@ -98,7 +98,7 @@ test('lock blocks skip/stop/reset/editing on every surface; pause and unlock sta
   await page.keyboard.press('ArrowRight')
   await page.keyboard.press('Escape')
   expect((await view())?.index).toBe(0)
-  await expect(heading(page)).toHaveText('Prepare')
+  await expect(timerPhase(page)).toHaveAttribute('data-phase', 'prepare')
 
   // IPC from renderer (stop, save workout)
   expect(await page.evaluate(() => window.api.command('stop'))).toEqual({ ok: false, error: 'locked' })
@@ -131,9 +131,9 @@ test('lock blocks skip/stop/reset/editing on every surface; pause and unlock sta
   // unlock restores control
   await page.getByRole('button', { name: 'Unlock timer' }).click()
   await page.keyboard.press('ArrowRight')
-  await expect(heading(page)).toHaveText('Work')
+  await expect(timerPhase(page)).toHaveAttribute('data-phase', 'work')
   await hook(app, 'shortcut', 'next')
-  await expect(heading(page)).toHaveText('Rest')
+  await expect(timerPhase(page)).toHaveAttribute('data-phase', 'rest')
   await app.close()
 })
 
@@ -193,7 +193,7 @@ test('navigation never stops a session; replacing asks and cancel preserves', as
 test('suspend pauses; quit offers paused recovery from the checkpoint', async () => {
   const { app, page, userData } = await startFixtureA()
   await advance(app, 65_000)
-  await expect(heading(page)).toHaveText('Work')
+  await expect(timerPhase(page)).toHaveAttribute('data-phase', 'work')
   await hook(app, 'suspend')
   await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible()
   await advance(app, 100_000)
@@ -209,7 +209,7 @@ test('suspend pauses; quit offers paused recovery from the checkpoint', async ()
   const dlg = again.page.getByRole('dialog', { name: 'Resume interrupted workout?' })
   await expect(dlg).toContainText('interval 2')
   await dlg.getByRole('button', { name: 'Resume (paused)' }).click()
-  await expect(heading(again.page)).toHaveText('Work')
+  await expect(timerPhase(again.page)).toHaveAttribute('data-phase', 'work')
   await expect(digits(again.page)).toHaveText('38')
   await expect(again.page.getByRole('button', { name: 'Resume' })).toBeVisible()
   await again.app.close()
@@ -318,11 +318,11 @@ test('settings rest colour applies; reset and stop controls work', async () => {
   await page.evaluate(() => window.api.updateSettings({ restColor: '#6a1b9a' }))
   await page.keyboard.press('ArrowRight')
   await page.keyboard.press('ArrowRight')
-  await expect(heading(page)).toHaveText('Rest')
+  await expect(timerPhase(page)).toHaveAttribute('data-phase', 'rest')
   await expect(page.locator('.timer-screen')).toHaveCSS('background-color', 'rgb(106, 27, 154)')
   await page.keyboard.press('Space')
   await page.getByRole('button', { name: 'Reset to first interval' }).click()
-  await expect(heading(page)).toHaveText('Prepare')
+  await expect(timerPhase(page)).toHaveAttribute('data-phase', 'prepare')
   await expect(page.locator('.interval-row.active')).toHaveText('1. Prepare: 01:00')
   await page.getByRole('button', { name: 'Stop workout' }).click()
   await expect(page.locator('.summary')).toBeVisible()
@@ -331,5 +331,48 @@ test('settings rest colour applies; reset and stop controls work', async () => {
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Desktop integration' })).toBeVisible()
   await expect(page.getByText('Always on top', { exact: true })).toBeVisible()
+  await app.close()
+})
+
+test('heading shows total remaining; noise, keep-awake and mini focus settings', async () => {
+  const { app, page } = await startFixtureA()
+  const head = page.locator('.phase-heading')
+  await expect(head).toHaveText('35:00')
+  await advance(app, 3000)
+  await expect(head).toHaveText('34:57')
+  await page.keyboard.press('ArrowRight')
+  await expect(head).toHaveText('34:00')
+  // switch back to the phase name
+  await page.evaluate(() => window.api.updateSettings({ timerHeading: 'phase' }))
+  await expect(head).toHaveText('Work')
+
+  // keep-awake follows the running state
+  await expect.poll(() => hook(app, 'keepAwakeActive')).toBe(true)
+  await page.keyboard.press('Space')
+  await expect.poll(() => hook(app, 'keepAwakeActive')).toBe(false)
+
+  // background noise: only while running, optionally only during Work
+  const noise = () => page.evaluate(() => (window as unknown as { __ttNoise: { kind: string } }).__ttNoise.kind)
+  await page.evaluate(() => window.api.updateSettings({ noise: 'brown', noiseVolume: 0.5, noiseDuring: 'work' }))
+  await expect.poll(noise).toBe('off') // paused
+  await page.keyboard.press('Space')
+  await expect.poll(noise).toBe('brown')
+  await page.keyboard.press('ArrowRight') // Rest
+  await expect.poll(noise).toBe('off')
+  await page.evaluate(() => window.api.updateSettings({ noiseDuring: 'session', noise: 'pink' }))
+  await expect.poll(noise).toBe('pink')
+  await page.evaluate(() => window.api.updateSettings({ muted: true }))
+  await expect.poll(noise).toBe('off')
+
+  // the mini timer does not take keyboard focus on Linux by default
+  await page.keyboard.press('m')
+  const mini = await miniPage(app)
+  if (process.platform === 'linux') {
+    expect(await hook(app, 'isFocusable', 'mini')).toBe(false)
+    await page.evaluate(() => window.api.updateSettings({ miniFocusable: true }))
+    await expect.poll(() => hook(app, 'isFocusable', 'mini')).toBe(true)
+  }
+  await mini.getByRole('button', { name: 'Pause' }).click()
+  await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible()
   await app.close()
 })

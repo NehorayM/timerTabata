@@ -16,9 +16,14 @@ No accounts, servers or network access are needed at runtime.
   (Ctrl+S) with unsaved-changes protection; Preview, History and Settings in the toolbar.
 - **Timer** – one deadline-based engine in the main process; phase colours, huge digits, numbered interval list with
   auto-follow (scroll away → “Current interval” button), Previous/Next, `set/sets • cycle/cycles` counters, Lock,
-  Pause/Resume, Reset, Stop, Finish state, transition/countdown/finish sounds (Web Audio, volume/mute).
+  Pause/Resume, Reset, Stop, Finish state. The faint heading shows the **total time remaining** in the workout
+  (or the phase name – Settings → Timer display).
+- **Sound** – four synthesized sound styles (beep, bell, whistle, digital watch), configurable countdown length
+  (1–10 s), optional halfway cue in Work, and optional **background noise** (white, pink or brown; whole workout or
+  Work only, own volume). Everything is generated locally with Web Audio.
   Hovering/focusing the heading shows Back, Mini timer, Always on top, Reset and Stop.
-- **Desktop** – mini timer window (frameless, draggable, resizable, always-on-top by default), native always-on-top,
+- **Desktop** – mini timer window (frameless, draggable, resizable, always-on-top by default, does not take keyboard
+  focus on Linux), keep-screen-awake while running, native always-on-top,
   tray (Show, Pause/Resume, Stop, Quit), close-to-tray, optional global shortcuts with collision reporting, window
   position persistence with off-screen recovery, single instance, OS-suspend pauses the timer, crash/quit recovery.
 
@@ -122,6 +127,9 @@ Assumptions (behaviour not shown in the references):
 - **Wayland**: compositors do not allow apps to keep themselves on top or grab global keys. Settings → Desktop
   integration reports this; enable *Use X11 (XWayland)* (restart required) or use the compositor's own
   window rule. In-app keyboard controls always work.
+- **Focus on Linux**: an always-on-top window that accepts focus can receive the keyboard after switching input
+  language. The mini timer is therefore non-focusable on Linux by default (Settings → Windows to change); a pinned
+  *main* window can still be focused – prefer the mini timer for an on-top timer.
 - **Tray on Linux** needs a StatusNotifier host (KDE, Cinnamon, XFCE, GNOME + AppIndicator extension). Without one,
   closing the main window during a workout asks whether to minimize or quit, and launching the app again restores
   the existing window (single instance).

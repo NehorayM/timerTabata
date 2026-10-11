@@ -27,6 +27,8 @@ interface ActiveSession {
   id: string
   workout: Workout
   seq: Interval[]
+  /** after[i] = seconds of all intervals following i. */
+  after: number[]
   engine: TimerEngine
   locked: boolean
   startedAt: number
@@ -155,7 +157,10 @@ export class SessionManager {
       return
     }
     if (display !== s.lastDisplay) {
-      if (display >= 1 && display <= 3) this.d.sound({ kind: 'countdown', seconds: display })
+      // Countdown events cover the last 10 s; the renderer applies the user's countdown length.
+      if (display >= 1 && display <= 10) this.d.sound({ kind: 'countdown', seconds: display })
+      const cur = s.engine.current
+      if (cur?.type === 'work' && cur.duration >= 10 && display === Math.floor(cur.duration / 2)) this.d.sound({ kind: 'halfway' })
       s.lastDisplay = display
       if (this.d.clock.now() - s.lastCheckpointAt >= this.checkpointEvery) this.checkpoint()
       this.emit()
@@ -192,6 +197,7 @@ export class SessionManager {
       remainingMs: e.remainingMs(),
       displaySeconds: e.displaySeconds(),
       intervalMs: (cur?.duration ?? 0) * 1000,
+      totalRemainingMs: cur ? e.remainingMs() + s.after[e.index] * 1000 : 0,
       locked: s.locked,
       set: (cur ?? last).set,
       sets: s.workout.sets,
@@ -220,10 +226,13 @@ export class SessionManager {
   private create(id: string, workout: Workout, startedAt: number, init?: { index: number; remainingMs: number }): ActiveSession {
     const seq = generateSequence(workout)
     const engine = new TimerEngine(seq, this.d.clock, init)
+    const after: number[] = new Array(seq.length).fill(0)
+    for (let i = seq.length - 2; i >= 0; i--) after[i] = after[i + 1] + seq[i + 1].duration
     return {
       id,
       workout,
       seq,
+      after,
       engine,
       locked: false,
       startedAt,

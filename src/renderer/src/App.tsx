@@ -3,7 +3,7 @@ import { formatDuration } from '../../shared/format'
 import type { OpenWorkoutRequest } from '../../shared/ipc'
 import type { SessionCheckpoint, Settings, Workout } from '../../shared/types'
 import { CARD_COLORS, newWorkout } from '../../shared/workout'
-import { playSound } from './audio'
+import { playSound, setNoise } from './audio'
 import { Modal, useUi } from './components/ui'
 import { api, useApiEvent, useSession, useSettings, useWorkouts } from './hooks'
 import { Editor } from './screens/Editor'
@@ -56,6 +56,21 @@ export function App(): React.JSX.Element {
     window.addEventListener('tt-test-sound', test)
     return () => window.removeEventListener('tt-test-sound', test)
   }, [])
+
+  // ---- background noise (main window only, keeps playing while hidden) ----
+  const noisePhase = session?.status === 'running' ? session.phase : null
+  const noiseOn =
+    !!settings &&
+    !settings.muted &&
+    settings.noise !== 'off' &&
+    noisePhase !== null &&
+    (settings.noiseDuring === 'session' || noisePhase === 'work')
+  const noiseKind = settings?.noise ?? 'off'
+  const noiseVolume = (settings?.noiseVolume ?? 0) * (settings?.volume ?? 0)
+  useEffect(() => {
+    setNoise(noiseOn ? noiseKind : 'off', noiseVolume)
+  }, [noiseOn, noiseKind, noiseVolume])
+  useEffect(() => () => setNoise('off', 0), [])
   useApiEvent('notice', (t) => ui.notify(t))
 
   // ---- editor helpers ----

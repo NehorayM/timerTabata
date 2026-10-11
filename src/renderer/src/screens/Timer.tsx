@@ -61,6 +61,8 @@ export function Timer({
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const locked = view.locked
   const color = sessionColor(view, settings)
+  const showRemaining = (settings?.timerHeading ?? 'remaining') === 'remaining' && !finished
+  const totalLeft = formatDuration(Math.ceil(view.totalRemainingMs / 1000))
 
   const cmd = async (c: SessionCommand): Promise<void> => {
     const r = await api.command(c)
@@ -140,9 +142,15 @@ export function Timer({
           onClick={() => void cmd(locked ? 'unlock' : 'lock')}
         />
         <div className="timer-center">
-          <h1 className="phase-heading" aria-live="polite">
-            {phaseLabel(view)}
-          </h1>
+          {showRemaining ? (
+            <h1 className="phase-heading heading-remaining" title="Total time remaining" aria-label={`${phaseLabel(view)} – ${totalLeft} total remaining`}>
+              {totalLeft}
+            </h1>
+          ) : (
+            <h1 className="phase-heading" aria-live="polite">
+              {phaseLabel(view)}
+            </h1>
+          )}
           <div className={`timer-controls ${showControls ? 'visible' : ''}`} role="toolbar" aria-label="Session controls">
             <IconButton icon="back" label="Back to workouts (timer keeps running)" disabled={locked} onClick={onBack} />
             <IconButton icon="mini" label="Open mini timer" onClick={() => void api.openMini()} />

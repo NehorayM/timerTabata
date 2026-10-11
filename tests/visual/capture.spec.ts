@@ -67,7 +67,7 @@ for (const size of [
 
     // Timer: Prepare at 57 – reference image 5
     await page.getByRole('button', { name: 'Start Workout' }).first().click()
-    await expect(page.locator('.phase-heading')).toHaveText('Prepare')
+    await expect(page.locator('.timer-screen')).toHaveAttribute('data-phase', 'prepare')
     await advance(app, 3000)
     await expect(page.locator('.digits')).toHaveText('57')
     await page.getByRole('button', { name: 'Pause' }).waitFor()
@@ -76,7 +76,7 @@ for (const size of [
 
     // Timer: Work (reference image for Work was not provided; colour per spec)
     await advance(app, 57_000)
-    await expect(page.locator('.phase-heading')).toHaveText('Work')
+    await expect(page.locator('.timer-screen')).toHaveAttribute('data-phase', 'work')
     await advance(app, 3000)
     await shot(page, p('timer-work'))
 

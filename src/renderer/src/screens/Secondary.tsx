@@ -169,13 +169,87 @@ export function SettingsScreen({
             />
             <span className="slider-value">{Math.round(settings.volume * 100)}%</span>
           </label>
+          <label className="select-row">
+            <span>Sound style</span>
+            <select value={settings.soundTheme} onChange={(e) => void update({ soundTheme: e.target.value as Settings['soundTheme'] })}>
+              <option value="beep">Beep</option>
+              <option value="bell">Bell</option>
+              <option value="whistle">Whistle</option>
+              <option value="digital">Digital watch</option>
+            </select>
+          </label>
           <label className="switch-row">
             <input type="checkbox" checked={settings.countdownBeeps} onChange={(e) => void update({ countdownBeeps: e.target.checked })} />
-            <span>Countdown beeps for the last 3 seconds</span>
+            <span>Countdown beeps at the end of each interval</span>
+          </label>
+          {settings.countdownBeeps && (
+            <label className="select-row">
+              <span>Countdown length</span>
+              <select value={settings.countdownFrom} onChange={(e) => void update({ countdownFrom: Number(e.target.value) })}>
+                {[1, 2, 3, 4, 5, 10].map((n) => (
+                  <option key={n} value={n}>
+                    Last {n} second{n === 1 ? '' : 's'}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label className="switch-row">
+            <input type="checkbox" checked={settings.halfwayAlert} onChange={(e) => void update({ halfwayAlert: e.target.checked })} />
+            <span>Halfway cue during Work (intervals of 10 s or more)</span>
           </label>
           <button className="outline-btn" onClick={() => window.dispatchEvent(new CustomEvent('tt-test-sound'))}>
             <Icon name="volume" /> Test sound
           </button>
+        </section>
+
+        <section className="settings-group" aria-labelledby="sg-noise">
+          <h2 id="sg-noise">Background noise</h2>
+          <label className="select-row">
+            <span>Noise</span>
+            <select value={settings.noise} onChange={(e) => void update({ noise: e.target.value as Settings['noise'] })}>
+              <option value="off">Off</option>
+              <option value="white">White noise</option>
+              <option value="pink">Pink noise</option>
+              <option value="brown">Brown noise</option>
+            </select>
+          </label>
+          <label className="slider-row">
+            <span>Noise volume</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={Math.round(settings.noiseVolume * 100)}
+              aria-valuetext={`${Math.round(settings.noiseVolume * 100)}%`}
+              onChange={(e) => void update({ noiseVolume: Number(e.target.value) / 100 })}
+            />
+            <span className="slider-value">{Math.round(settings.noiseVolume * 100)}%</span>
+          </label>
+          <label className="select-row">
+            <span>Play noise</span>
+            <select value={settings.noiseDuring} onChange={(e) => void update({ noiseDuring: e.target.value as Settings['noiseDuring'] })}>
+              <option value="session">During the whole workout</option>
+              <option value="work">Only during Work</option>
+            </select>
+          </label>
+          <p className="muted">Noise plays while a workout is running and stops when it is paused, finished or muted.</p>
+        </section>
+
+        <section className="settings-group" aria-labelledby="sg-display">
+          <h2 id="sg-display">Timer display</h2>
+          <label className="select-row">
+            <span>Heading shows</span>
+            <select value={settings.timerHeading} onChange={(e) => void update({ timerHeading: e.target.value as Settings['timerHeading'] })}>
+              <option value="remaining">Total time remaining</option>
+              <option value="phase">Phase name (Work / Rest…)</option>
+            </select>
+          </label>
+          <label className="switch-row">
+            <input type="checkbox" checked={settings.keepAwake} onChange={(e) => void update({ keepAwake: e.target.checked })} />
+            <span>Keep the screen awake while a workout runs</span>
+          </label>
         </section>
 
         <section className="settings-group" aria-labelledby="sg-colors">
@@ -200,6 +274,12 @@ export function SettingsScreen({
             <input type="checkbox" checked={settings.alwaysOnTopMini} onChange={(e) => void api.setAlwaysOnTop('mini', e.target.checked)} />
             <span>Keep mini timer always on top</span>
           </label>
+          {caps?.platform === 'linux' && (
+            <label className="switch-row">
+              <input type="checkbox" checked={settings.miniFocusable} onChange={(e) => void update({ miniFocusable: e.target.checked })} />
+              <span>Let the mini timer take keyboard focus (off prevents it from grabbing typing after a keyboard-language switch)</span>
+            </label>
+          )}
           <label className="switch-row">
             <input type="checkbox" checked={settings.closeToTray} onChange={(e) => void update({ closeToTray: e.target.checked })} />
             <span>Closing the window hides it to the system tray</span>

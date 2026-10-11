@@ -16,6 +16,7 @@ export interface WindowHooks {
   onMiniClosed: () => void
   alwaysOnTopMain: () => boolean
   alwaysOnTopMini: () => boolean
+  miniFocusable: () => boolean
 }
 
 export class WindowManager {
@@ -85,11 +86,16 @@ export class WindowManager {
 
   openMini(): BrowserWindow {
     if (this.mini && !this.mini.isDestroyed()) {
-      this.mini.show()
+      if (this.mini.isFocusable()) this.mini.show()
+      else this.mini.showInactive()
       return this.mini
     }
     const b = this.placement(this.state.mini, MINI_DEFAULT)
+    // On Linux an always-on-top window that accepts focus can receive the keyboard after
+    // input-source (language) switches; by default the mini timer never takes focus.
+    const focusable = process.platform !== 'linux' || this.hooks.miniFocusable()
     const win = new BrowserWindow({
+      focusable,
       ...b,
       minWidth: 200,
       minHeight: 110,
@@ -103,7 +109,7 @@ export class WindowManager {
       webPreferences: this.webPreferences()
     })
     if (this.hooks.alwaysOnTopMini()) win.setAlwaysOnTop(true, 'floating')
-    win.once('ready-to-show', () => win.show())
+    win.once('ready-to-show', () => (focusable ? win.show() : win.showInactive()))
     const persist = (): void => this.scheduleSave('mini', win)
     win.on('resize', persist)
     win.on('move', persist)

@@ -11,6 +11,7 @@ import {
   nativeImage,
   net,
   powerMonitor,
+  powerSaveBlocker,
   protocol,
   shell,
   Tray,
@@ -67,7 +68,8 @@ function main(): void {
     onMainClose: (e) => onMainClose(e),
     onMiniClosed: () => {},
     alwaysOnTopMain: () => data.getSettings().alwaysOnTopMain,
-    alwaysOnTopMini: () => data.getSettings().alwaysOnTopMini
+    alwaysOnTopMini: () => data.getSettings().alwaysOnTopMini,
+    miniFocusable: () => data.getSettings().miniFocusable
   })
 
   function send<K extends keyof ApiEvents>(event: K, payload: ApiEvents[K], target: 'all' | 'main' = 'all'): void {
@@ -83,6 +85,7 @@ function main(): void {
       send('session', view)
       updateTray(view)
       updateTicker()
+      updateKeepAwake()
     },
     sound: (ev) => send('sound', ev, 'main'),
     saveCheckpoint: (cp) => {
@@ -100,6 +103,17 @@ function main(): void {
       }
     }
   })
+
+  let awakeId: number | null = null
+  /** Keeps the display on while a workout runs (if enabled). */
+  function updateKeepAwake(): void {
+    const want = manager.running && data.getSettings().keepAwake
+    if (want && awakeId === null) awakeId = powerSaveBlocker.start('prevent-display-sleep')
+    else if (!want && awakeId !== null) {
+      powerSaveBlocker.stop(awakeId)
+      awakeId = null
+    }
+  }
 
   function updateTicker(): void {
     if (fakeClock) return
@@ -365,6 +379,8 @@ function main(): void {
       const p = patch as Record<string, unknown>
       if ('alwaysOnTopMain' in p) windows.main?.setAlwaysOnTop(r.value.alwaysOnTopMain, 'floating')
       if ('alwaysOnTopMini' in p) windows.mini?.setAlwaysOnTop(r.value.alwaysOnTopMini, 'floating')
+      if ('miniFocusable' in p && process.platform === 'linux') windows.mini?.setFocusable(r.value.miniFocusable)
+      if ('keepAwake' in p) updateKeepAwake()
       if ('globalShortcutsEnabled' in p || 'shortcuts' in p) applyShortcuts()
       send('settings', r.value)
       return r
@@ -496,7 +512,9 @@ function main(): void {
           if (item && item.enabled !== false) (item.click as () => void)()
         },
         shortcut: (a: ShortcutAction) => shortcutAction(a),
-        isAlwaysOnTop: (t: 'main' | 'mini') => (t === 'main' ? windows.main : windows.mini)?.isAlwaysOnTop() ?? null
+        isAlwaysOnTop: (t: 'main' | 'mini') => (t === 'main' ? windows.main : windows.mini)?.isAlwaysOnTop() ?? null,
+        isFocusable: (t: 'main' | 'mini') => (t === 'main' ? windows.main : windows.mini)?.isFocusable() ?? null,
+        keepAwakeActive: () => awakeId !== null && powerSaveBlocker.isStarted(awakeId)
       })
       ;(globalThis as unknown as { __tt: unknown }).__tt = testHooks
     }

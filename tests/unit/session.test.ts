@@ -169,4 +169,30 @@ describe('SessionManager', () => {
     m2.tick()
     expect(out[out.length - 1]).toMatchObject({ index: 2, status: 'running' })
   })
+
+  it('reports total remaining time of the whole workout', () => {
+    m.start(fixtureA())
+    expect(last().totalRemainingMs).toBe(2_100_000)
+    clock.advance(3000)
+    m.tick()
+    expect(Math.ceil(last().totalRemainingMs / 1000)).toBe(2097)
+    m.command('next')
+    expect(last().totalRemainingMs).toBe(2_040_000)
+    m.command('pause')
+    clock.advance(50_000)
+    m.tick()
+    expect(last().totalRemainingMs).toBe(2_040_000)
+  })
+
+  it('emits countdown events for the last 10 s and a halfway cue in Work', () => {
+    const w = { ...newWorkout('w', 0), prepare: 0, work: 30, rest: 0, cycles: 1 }
+    m.start(w)
+    for (let i = 0; i < 30; i++) {
+      clock.advance(1000)
+      m.tick()
+    }
+    expect(sounds.filter((x) => x.kind === 'halfway')).toHaveLength(1)
+    expect(sounds.filter((x) => x.kind === 'countdown').map((x) => (x as { seconds: number }).seconds)).toEqual([10, 9, 8, 7, 6, 5, 4, 3, 2, 1])
+    expect(sounds[sounds.length - 1]).toEqual({ kind: 'finish' })
+  })
 })

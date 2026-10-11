@@ -43,10 +43,29 @@ export type SortKey = 'updated' | 'name' | 'duration' | 'created' | 'used'
 
 export type ShortcutAction = 'toggle' | 'next' | 'previous' | 'stop' | 'show'
 
+export type SoundTheme = 'beep' | 'bell' | 'whistle' | 'digital'
+export type NoiseKind = 'off' | 'white' | 'pink' | 'brown'
+export type TimerHeading = 'remaining' | 'phase'
+
 export interface Settings {
   volume: number
   muted: boolean
   countdownBeeps: boolean
+  /** Countdown beeps for the last N seconds of an interval (1-10). */
+  countdownFrom: number
+  soundTheme: SoundTheme
+  /** Short cue halfway through Work intervals of 10 s or more. */
+  halfwayAlert: boolean
+  noise: NoiseKind
+  noiseVolume: number
+  /** Play background noise during every running interval or only during Work. */
+  noiseDuring: 'session' | 'work'
+  /** What the faint timer heading shows. */
+  timerHeading: TimerHeading
+  /** Prevent display sleep while a workout runs. */
+  keepAwake: boolean
+  /** Let the mini timer take keyboard focus (off avoids focus stealing on Linux). */
+  miniFocusable: boolean
   restColor: string
   closeToTray: boolean
   alwaysOnTopMain: boolean
@@ -73,6 +92,8 @@ export interface SessionView {
   displaySeconds: number
   /** Full duration of the current interval in ms (0 when finished). */
   intervalMs: number
+  /** Remaining ms of the whole workout (current interval + all following). */
+  totalRemainingMs: number
   locked: boolean
   set: number
   sets: number
@@ -120,6 +141,7 @@ export type SessionCommand =
 export type SoundEvent =
   | { kind: 'transition'; type: IntervalType }
   | { kind: 'countdown'; seconds: number }
+  | { kind: 'halfway' }
   | { kind: 'finish' }
 
 export interface Capability {

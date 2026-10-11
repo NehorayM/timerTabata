@@ -250,6 +250,14 @@ export function SettingsScreen({
             <input type="checkbox" checked={settings.keepAwake} onChange={(e) => void update({ keepAwake: e.target.checked })} />
             <span>Keep the screen awake while a workout runs</span>
           </label>
+          <label className="switch-row">
+            <input
+              type="checkbox"
+              checked={settings.hardwareAcceleration}
+              onChange={(e) => void update({ hardwareAcceleration: e.target.checked })}
+            />
+            <span>Use graphics (GPU) acceleration – restart required; turned off automatically if the graphics driver crashes</span>
+          </label>
         </section>
 
         <section className="settings-group" aria-labelledby="sg-colors">

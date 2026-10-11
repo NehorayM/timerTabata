@@ -66,6 +66,8 @@ export interface Settings {
   keepAwake: boolean
   /** Let the mini timer take keyboard focus (off avoids focus stealing on Linux). */
   miniFocusable: boolean
+  /** GPU acceleration; turned off automatically after a GPU crash (applies on next start). */
+  hardwareAcceleration: boolean
   restColor: string
   closeToTray: boolean
   alwaysOnTopMain: boolean

@@ -54,6 +54,7 @@ export const SettingsSchema = z.object({
   timerHeading: z.enum(['remaining', 'phase']).default('remaining'),
   keepAwake: z.boolean().default(true),
   miniFocusable: z.boolean().default(false),
+  hardwareAcceleration: z.boolean().default(true),
   restColor: color.default(DEFAULT_REST_COLOR),
   closeToTray: z.boolean().default(true),
   alwaysOnTopMain: z.boolean().default(false),

@@ -260,3 +260,18 @@ test('work image is copied into app storage and shown during Work', async () => 
   await expect(img).toHaveCount(0)
   await app.close()
 })
+
+test('starts and shows its window with GPU acceleration disabled (setting or --disable-gpu)', async () => {
+  const userData = tempDir()
+  seed(userData, referenceWorkouts(), { hardwareAcceleration: false })
+  const a = await launch({ userData, env: { TT_NO_TRAY: '1' } })
+  expect(await a.app.evaluate(({ app }) => app.isHardwareAccelerationEnabled())).toBe(false)
+  expect(await a.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())).toBe(true)
+  await expect(a.page.locator('.toolbar-title')).toHaveText('Workouts: 4')
+  await a.app.close()
+  seed(userData, referenceWorkouts(), {})
+  const b = await launch({ userData, env: { TT_NO_TRAY: '1' }, args: ['--disable-gpu'] })
+  expect(await b.app.evaluate(({ app }) => app.isHardwareAccelerationEnabled())).toBe(false)
+  await expect(b.page.locator('.toolbar-title')).toHaveText('Workouts: 4')
+  await b.app.close()
+})

@@ -41,6 +41,9 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
 
 const data = new DataService(app.getPath('userData'))
 if (process.platform === 'linux' && data.getSettings().preferX11) app.commandLine.appendSwitch('ozone-platform', 'x11')
+// The timer needs no GPU. Some Linux drivers crash Chromium's GPU process (seen with old VA-API),
+// so acceleration is switched off on request, after a GPU crash, or with --disable-gpu.
+if (!data.getSettings().hardwareAcceleration || process.argv.includes('--disable-gpu')) app.disableHardwareAcceleration()
 
 function resourcePath(file: string): string {
   return app.isPackaged ? path.join(process.resourcesPath, file) : path.join(__dirname, '../../resources', file)
@@ -467,6 +470,13 @@ function main(): void {
   })
 
   app.on('window-all-closed', () => app.quit())
+
+  app.on('child-process-gone', (_e, details) => {
+    if (details.type !== 'GPU' || details.reason === 'clean-exit' || !data.getSettings().hardwareAcceleration) return
+    console.warn('GPU process crashed; disabling hardware acceleration for the next start', details.reason)
+    const r = data.updateSettings({ hardwareAcceleration: false })
+    if (r.ok) send('settings', r.value)
+  })
 
   app.whenReady().then(async () => {
     Menu.setApplicationMenu(null)

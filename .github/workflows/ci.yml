@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test-package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      # No signing certificate is configured: installers are unsigned.
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Fetch the Electron binary up front so parallel test workers don't race to download it (ETXTBSY).
+      - run: node node_modules/electron/install.js
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+      - name: E2E (Linux, Xvfb)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a --server-args="-screen 0 1920x1080x24" npx playwright test --project=e2e --project=visual
+      - name: E2E (Windows)
+        if: runner.os == 'Windows'
+        run: npx playwright test --project=e2e --project=visual
+
+      - name: Package Linux (AppImage + deb)
+        if: runner.os == 'Linux'
+        run: npx electron-builder --linux AppImage deb --publish never
+      - name: Package Windows (NSIS)
+        if: runner.os == 'Windows'
+        run: npx electron-builder --win nsis --publish never
+
+      - name: Packaged smoke test (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npx playwright test --project=packaged
+      - name: Packaged smoke test (Windows)
+        if: runner.os == 'Windows'
+        run: npx playwright test --project=packaged
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-${{ matrix.os }}
+          if-no-files-found: ignore
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/*.exe
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-qa-${{ matrix.os }}
+          if-no-files-found: ignore
+          path: docs/visual-qa/actual/
